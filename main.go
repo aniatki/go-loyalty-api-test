@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/joho/godotenv"
 	"net/http"
 	"os"
-	"github.com/joho/godotenv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
@@ -22,7 +22,7 @@ type Item struct {
 }
 
 type Tag struct {
-	ID   uint   `json:"id" gorm:"primaryKey"`
+	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
 	Name string `json:"name"`
 }
 
@@ -33,15 +33,19 @@ type CreateItemInput struct {
 	Tags        []Tag   `json:"tags"`
 }
 
+type UpdateItemTagsInput struct {
+	TagIDs []uint `json:"tag_ids"`
+}
+
 func InitDB() {
-	dsn := ftm.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", 
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_NAME"),
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSL_MODE"),
-		)
+	)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		panic("Failed to connect to database")
@@ -65,6 +69,7 @@ func main() {
 	// Items routes
 	r.POST("/items", createItem)
 	r.GET("/items", getItems)
+	r.PATCH("/items/:id", updateItemTags)
 
 	// Tags routes
 	r.GET("/tags", getTags)
@@ -109,6 +114,35 @@ func getItems(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, items)
+}
+
+func updateItemTags(c *gin.Context) {
+	var input UpdateItemTagsInput
+	if err := c.ShouldBindBodyWithJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var item Item
+	if err := DB.Preload("Tags").First(&item, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Item not found"})
+		return
+	}
+
+	var tags []Tag
+	if len(input.TagIDs) > 0 {
+		if err := DB.Where("id IN ?", input.TagIDs).Find(&tags).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tags"})
+			return
+		}
+	}
+
+	if err := DB.Model(&item).Association("Tags").Replace(tags); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update tags"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Tags updated successfully", "item": item})
 }
 
 func getTags(c *gin.Context) {
