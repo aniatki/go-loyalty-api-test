@@ -1,10 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
-	"github.com/joho/godotenv"
 	"net/http"
 	"os"
+	"strings"
+
+	"github.com/joho/godotenv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
@@ -23,7 +26,7 @@ type Item struct {
 
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name string `json:"name"`
+	Name string `json:"name" gorm:"unique"`
 }
 
 type CreateItemInput struct {
@@ -37,7 +40,7 @@ type UpdateItemTagsInput struct {
 	TagIDs []uint `json:"tag_ids"`
 }
 
-func InitDB() {
+func InitDB() *gorm.DB {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
@@ -54,11 +57,18 @@ func InitDB() {
 	DB = db
 	fmt.Println("Connected to database")
 
-	// AutoMigrate will create tables and add missing columns
 	err = DB.AutoMigrate(&Item{}, &Tag{})
 	if err != nil {
 		panic("Failed to migrate database")
 	}
+
+	return db
+}
+
+func ResetDB() {
+	DB := InitDB()
+	DB.Migrator().DropTable(&Item{}, &Tag{})
+	DB.AutoMigrate(&Item{}, &Tag{})
 }
 
 func main() {
@@ -66,12 +76,10 @@ func main() {
 
 	r := gin.Default()
 
-	// Items routes
 	r.POST("/items", createItem)
 	r.GET("/items", getItems)
 	r.PATCH("/items/:id", updateItemTags)
 
-	// Tags routes
 	r.GET("/tags", getTags)
 	r.POST("/tags", createTag)
 
@@ -82,8 +90,6 @@ func main() {
 
 	r.Run(":" + port)
 }
-
-// Handler functions
 
 func createItem(c *gin.Context) {
 	var input CreateItemInput
@@ -151,6 +157,7 @@ func getTags(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tags"})
 		return
 	}
+
 	c.JSON(http.StatusOK, tags)
 }
 
@@ -158,6 +165,16 @@ func createTag(c *gin.Context) {
 	var tag Tag
 	if err := c.ShouldBindJSON(&tag); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	tag.Name = strings.ToLower(tag.Name)
+	var existing Tag
+	if err := DB.Where("name = ?", tag.Name).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Tag already exists"})
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
 		return
 	}
 
