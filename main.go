@@ -24,11 +24,6 @@ type Item struct {
 	Tags        []Tag   `json:"tags" gorm:"many2many:item_tags"`
 }
 
-type Tag struct {
-	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name string `json:"name" gorm:"unique"`
-}
-
 type CreateItemInput struct {
 	Name        string  `json:"name" binding:"required"`
 	Description string  `json:"description"`
@@ -40,6 +35,12 @@ type UpdateItemTagsInput struct {
 	TagIDs []uint `json:"tag_ids"`
 }
 
+type Tag struct {
+	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name string `json:"name" gorm:"unique"`
+}
+
+// Main entrypoint
 func InitDB() *gorm.DB {
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
@@ -82,10 +83,10 @@ func main() {
 
 	r.GET("/tags", getTags)
 	r.POST("/tags", createTag)
-
+	r.DELETE("/tags/:id", deleteTag)
 	port := os.Getenv("APP_PORT")
 	if port == "" {
-		port = 8080
+		port = string(8080)
 	}
 
 	r.Run(":" + port)
@@ -184,4 +185,26 @@ func createTag(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, tag)
+}
+
+func deleteTag(c *gin.Context) {
+	id := c.Param("id")
+
+	var tag Tag
+	if err := DB.Where("id = ?", id).First(&tag).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Tag not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		}
+		return
+	}
+
+	if err := DB.Delete(&tag).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tag"})
+
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
