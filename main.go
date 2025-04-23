@@ -3,15 +3,14 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"log"
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/joho/godotenv"
-
-	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
@@ -37,11 +36,18 @@ type UpdateItemTagsInput struct {
 
 type Tag struct {
 	ID   uint   `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name string `json:"name" gorm:"unique"`
+	Name string `json:"name" gorm:"unique; not null"`
 }
 
 // Main entrypoint
 func InitDB() *gorm.DB {
+	requiredVars := []string{"DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_PORT", "DB_SSL_MODE"}
+	for _, v := range requiredVars {
+		if os.Getenv(v) == "" {
+			panic(fmt.Sprintf("Missing required environment variable: %s", v))
+		}
+	}
+
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
@@ -50,19 +56,51 @@ func InitDB() *gorm.DB {
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSL_MODE"),
 	)
+
+	fmt.Printf("Connecting with DSN: host=%s user=%s password=**** dbname=%s port=%s sslmode=%s\n",
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_SSL_MODE"),
+	)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		panic("Failed to connect to database")
+		panic(fmt.Sprintf("Failed to connect to database: %v", err))
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		panic(fmt.Sprintf("Failed to get database instance: %v", err))
+	}
+
+	if err := sqlDB.Ping(); err != nil {
+		panic(fmt.Sprintf("Failed to ping database: %v", err))
+	}
+
+	fmt.Println("Successfully connected to database")
+
+	if err := db.AutoMigrate(&Item{}, &Tag{}); err != nil {
+		panic(fmt.Sprintf("Migration failed: %v", err))
+	}
+
+	err = db.AutoMigrate(&Item{}, &Tag{})
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			fmt.Println("Warning: Duplicate tags detected. Cleaning up...")
+
+			db.Exec("DELETE FROM tags WHERE id NOT IN (SELECT MIN(id) FROM tags GROUP BY name)")
+
+			if err := db.AutoMigrate(&Tag{}); err != nil {
+				panic(fmt.Sprintf("Retry migration failed: %v", err))
+			}
+		} else {
+			panic(fmt.Sprintf("Migration failed: %v", err))
+		}
 	}
 
 	DB = db
-	fmt.Println("Connected to database")
-
-	err = DB.AutoMigrate(&Item{}, &Tag{})
-	if err != nil {
-		panic("Failed to migrate database")
-	}
-
 	return db
 }
 
@@ -73,6 +111,10 @@ func ResetDB() {
 }
 
 func main() {
+	err := godotenv.Load("C:/Users/User/OneDrive/Desktop/Repositories/loyalty-api/.env")
+	if err != nil {
+		log.Fatal("Error loading .env file from absolute path:", err)
+	}
 	InitDB()
 
 	r := gin.Default()
@@ -170,12 +212,17 @@ func createTag(c *gin.Context) {
 	}
 
 	tag.Name = strings.ToLower(tag.Name)
+
 	var existing Tag
-	if err := DB.Where("name = ?", tag.Name).First(&existing).Error; err == nil {
+	err := DB.Where("name = ?", tag.Name).First(&existing).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+		} else {
+			c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
+			return
+		}
+	} else {
 		c.JSON(http.StatusConflict, gin.H{"error": "Tag already exists"})
-		return
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
 		return
 	}
 
@@ -201,9 +248,7 @@ func deleteTag(c *gin.Context) {
 
 	if err := DB.Delete(&tag).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tag"})
-
 		return
 	}
-
 	c.Status(http.StatusNoContent)
 }
