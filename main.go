@@ -189,7 +189,6 @@ func createTag(c *gin.Context) {
 
 func deleteTag(c *gin.Context) {
 	id := c.Param("id")
-
 	var tag Tag
 	if err := DB.Where("id = ?", id).First(&tag).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
