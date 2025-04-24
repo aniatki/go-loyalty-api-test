@@ -104,11 +104,11 @@ func InitDB() *gorm.DB {
 	return db
 }
 
-func ResetDB() {
-	DB := InitDB()
-	DB.Migrator().DropTable(&Item{}, &Tag{})
-	DB.AutoMigrate(&Item{}, &Tag{})
-}
+//func ResetDB() {
+//	DB := InitDB()
+//	DB.Migrator().DropTable(&Item{}, &Tag{})
+//	DB.AutoMigrate(&Item{}, &Tag{})
+//}
 
 func main() {
 	err := godotenv.Load("C:/Users/User/OneDrive/Desktop/Repositories/loyalty-api/.env")
@@ -145,7 +145,7 @@ func createItem(c *gin.Context) {
 		Name:        input.Name,
 		Description: input.Description,
 		Price:       input.Price,
-		Tags:        input.Tags,
+		Tags:        nil,
 	}
 
 	if err := DB.Create(&item).Error; err != nil {
@@ -204,34 +204,43 @@ func getTags(c *gin.Context) {
 	c.JSON(http.StatusOK, tags)
 }
 
+func getFormattedTag(tag string) string {
+	tag = strings.ToLower(tag)
+	words := strings.Fields(tag)
+	return strings.Join(words, "")
+}
+
 func createTag(c *gin.Context) {
 	var tag Tag
+
+	// Step 1: Bind the incoming JSON
 	if err := c.ShouldBindJSON(&tag); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	tag.Name = strings.ToLower(tag.Name)
+	// Step 2: Format the tag name (lowercase, no spaces etc.)
+	tag.Name = getFormattedTag(tag.Name)
 
+	// Step 3: Check if it already exists
 	var existing Tag
 	err := DB.Where("name = ?", tag.Name).First(&existing).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-		} else {
-			c.JSON(http.StatusConflict, gin.H{"error": "DB error"})
-			return
-		}
-	} else {
+	if err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "Tag already exists"})
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
 
+	// Step 4: Create tag
 	if err := DB.Create(&tag).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
 	}
 
 	c.JSON(http.StatusOK, tag)
+
 }
 
 func deleteTag(c *gin.Context) {
