@@ -213,16 +213,13 @@ func getFormattedTag(tag string) string {
 func createTag(c *gin.Context) {
 	var tag Tag
 
-	// Step 1: Bind the incoming JSON
 	if err := c.ShouldBindJSON(&tag); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Step 2: Format the tag name (lowercase, no spaces etc.)
 	tag.Name = getFormattedTag(tag.Name)
 
-	// Step 3: Check if it already exists
 	var existing Tag
 	err := DB.Where("name = ?", tag.Name).First(&existing).Error
 	if err == nil {
@@ -233,7 +230,6 @@ func createTag(c *gin.Context) {
 		return
 	}
 
-	// Step 4: Create tag
 	if err := DB.Create(&tag).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create tag"})
 		return
@@ -245,18 +241,13 @@ func createTag(c *gin.Context) {
 
 func deleteTag(c *gin.Context) {
 	id := c.Param("id")
-	var tag Tag
-	if err := DB.Where("id = ?", id).First(&tag).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Tag not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		}
+	result := DB.Where("id = ?", id).Delete(&Tag{})
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
 		return
 	}
-
-	if err := DB.Delete(&tag).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete tag"})
+	if result.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Tag not found"})
 		return
 	}
 	c.Status(http.StatusNoContent)
