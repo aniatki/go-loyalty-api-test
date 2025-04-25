@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/aniatki/loyalty-api/internal/models"
+	"github.com/aniatki/loyalty-api/internal/services"
 	"github.com/gin-gonic/gin"
-	"loyalty-api/internal/models"
-	"loyalty-api/internal/services"
 )
 
 type ItemHandler struct {

@@ -1,6 +1,9 @@
 package services
 
-import "loyalty-api/internal/models"
+import (
+	"github.com/aniatki/loyalty-api/internal/models"
+	"github.com/aniatki/loyalty-api/internal/repositories"
+)
 
 type ItemService interface {
 	CreateItem(input models.CreateItemInput) (*models.Item, error)

@@ -3,9 +3,9 @@ package services
 import (
 	"errors"
 	"fmt"
+	"github.com/aniatki/loyalty-api/internal/models"
+	"github.com/aniatki/loyalty-api/internal/repositories"
 	"gorm.io/gorm"
-	"loyalty-api/internal/models"
-	"loyalty-api/internal/repositories"
 	"strings"
 )
 

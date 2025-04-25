@@ -2,11 +2,11 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strings"
-
+	"github.com/aniatki/loyalty-api/internal/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"os"
+	"strings"
 )
 
 func InitDB() *gorm.DB {

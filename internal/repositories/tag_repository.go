@@ -1,8 +1,8 @@
 package repositories
 
 import (
+	"github.com/aniatki/loyalty-api/internal/models"
 	"gorm.io/gorm"
-	"loyalty-api/internal/models"
 )
 
 type TagRepository interface {

@@ -1,8 +1,8 @@
 package routes
 
 import (
+	"github.com/aniatki/loyalty-api/internal/handlers"
 	"github.com/gin-gonic/gin"
-	"loyalty-api/internal/handlers"
 )
 
 func SetupRoutes(r *gin.Engine, itemHandler *handlers.ItemHandler, tagHandler *handlers.TagHandler) {

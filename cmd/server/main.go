@@ -4,13 +4,13 @@ import (
 	"log"
 	"os"
 
+	"github.com/aniatki/loyalty-api/internal/config"
+	"github.com/aniatki/loyalty-api/internal/handlers"
+	"github.com/aniatki/loyalty-api/internal/repositories"
+	"github.com/aniatki/loyalty-api/internal/routes"
+	"github.com/aniatki/loyalty-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"loyalty-api/internal/config"
-	"loyalty-api/internal/handlers"
-	"loyalty-api/internal/repositories"
-	"loyalty-api/internal/routes"
-	"loyalty-api/internal/services"
 )
 
 func main() {
