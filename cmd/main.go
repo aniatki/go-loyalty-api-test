@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"your-app/internal/config"
-	"your-app/internal/handlers"
-	"your-app/internal/repositories"
-	"your-app/internal/routes"
-	"your-app/internal/services"
+	"loyalty-api/internal/config"
+	"loyalty-api/internal/handlers"
+	"loyalty-api/internal/repositories"
+	"loyalty-api/internal/routes"
+	"loyalty-api/internal/services"
 )
 
 func main() {

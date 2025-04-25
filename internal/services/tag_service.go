@@ -1,7 +1,11 @@
 package services
 
 import (
+	"errors"
+	"fmt"
+	"gorm.io/gorm"
 	"loyalty-api/internal/models"
+	"loyalty-api/internal/repositories"
 	"strings"
 )
 
