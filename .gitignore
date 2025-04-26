@@ -3,3 +3,5 @@
 .env.development
 .env.production
 .env.test
+build_log.txt
+
